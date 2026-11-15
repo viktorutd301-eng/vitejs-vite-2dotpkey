@@ -1486,7 +1486,7 @@ export default function App() {
                     : 'text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100'
                 }`}
               >
-                Ôn Thi Vào 10 (>50 Đề Sở)
+                Ôn Thi Vào 10 (60+ Đề Sở)
               </button>
 
               {/* MỤC MỚI: ÔN THI CHUYÊN (MÀU SÁNG NỔI BẬT + CHỮ PREMIUM Ở DƯỚI) */}
