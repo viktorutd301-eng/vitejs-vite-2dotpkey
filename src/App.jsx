@@ -586,35 +586,54 @@ export default function App() {
   const [selectedYear, setSelectedYear] = useState('all');
   const [examSearch, setExamSearch] = useState('');
 
-  // Hệ thống Giữ Chuỗi (Streak) & KPI 200 XP / ngày
+// Hệ thống Giữ Chuỗi (Streak) & KPI 200 XP / ngày (Tự động đọc từ LocalStorage)
   const DAILY_KPI_XP = 200;
-  const [todayXp, setTodayXp] = useState(140);
-  const [streakDays, setStreakDays] = useState(7);
-  const [streakUnlockedToday, setStreakUnlockedToday] = useState(false);
+  const [todayXp, setTodayXp] = useState(() => {
+    const saved = localStorage.getItem('studyez_todayXp');
+    return saved !== null ? Number(saved) : 140;
+  });
+  const [streakDays, setStreakDays] = useState(() => {
+    const saved = localStorage.getItem('studyez_streakDays');
+    return saved !== null ? Number(saved) : 7;
+  });
+  const [streakUnlockedToday, setStreakUnlockedToday] = useState(() => {
+    return localStorage.getItem('studyez_streakUnlocked') === 'true';
+  });
   const [xpToast, setXpToast] = useState(null);
 
-  // Cấu hình Avatar Học sinh Việt Nam & Ảnh tải từ máy
-  const [avatarConfig, setAvatarConfig] = useState({
-    hair: 'boy_neat',
-    outfit: 'uniform_scarf',
-    glasses: true,
-    bgTheme: 'class'
+  // Cấu hình Avatar Học sinh Việt Nam & Ảnh tải từ máy (Lưu cố định)
+  const [avatarConfig, setAvatarConfig] = useState(() => {
+    const saved = localStorage.getItem('studyez_avatarConfig');
+    return saved ? JSON.parse(saved) : {
+      hair: 'boy_neat',
+      outfit: 'uniform_scarf',
+      glasses: true,
+      bgTheme: 'class'
+    };
   });
-  const [customAvatarUrl, setCustomAvatarUrl] = useState(null);
+  const [customAvatarUrl, setCustomAvatarUrl] = useState(() => {
+    return localStorage.getItem('studyez_customAvatarUrl') || null;
+  });
 
-  // Tài khoản Nickname & Đăng nhập Gmail
-  const [currentUser, setCurrentUser] = useState({
-    nickname: '@minhthao_studyez_k9',
-    email: 'minhthao.dongnai@gmail.com',
-    role: 'student',
-    solvedCount: 28,
-    savedExamIds: []
+  // Tài khoản Nickname & Đăng nhập Gmail (Lưu cố định)
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('studyez_currentUser');
+    return saved ? JSON.parse(saved) : {
+      nickname: '@minhthao_studyez_k9',
+      email: 'minhthao.dongnai@gmail.com',
+      role: 'student',
+      solvedCount: 28,
+      savedExamIds: []
+    };
   });
   const [authForm, setAuthForm] = useState({ nickname: '', email: '', password: '', isAdmin: false });
   const [showGmailModal, setShowGmailModal] = useState(false);
 
-  // Trạng thái làm bài tập Chương
-  const [chapterMcqAnswers, setChapterMcqAnswers] = useState({});
+  // Trạng thái làm bài tập Chương (Lưu câu đã làm)
+  const [chapterMcqAnswers, setChapterMcqAnswers] = useState(() => {
+    const saved = localStorage.getItem('studyez_chapterMcqAnswers');
+    return saved ? JSON.parse(saved) : {};
+  });
   const [chapterEssayDrafts, setChapterEssayDrafts] = useState({});
   const [revealedEssays, setRevealedEssays] = useState({});
 
@@ -626,8 +645,33 @@ export default function App() {
   const [examSubmitted, setExamSubmitted] = useState(false);
   const [timeLeftSec, setTimeLeftSec] = useState(5400);
 
-  // Trạng thái Cộng đồng Hỏi Đáp 24/7 (EzAsk)
-  const [qaPosts, setQaPosts] = useState(INITIAL_QA_POSTS);
+  // Trạng thái Cộng đồng Hỏi Đáp 24/7 (Lưu câu hỏi mới đã đăng)
+  const [qaPosts, setQaPosts] = useState(() => {
+    const saved = localStorage.getItem('studyez_qaPosts');
+    return saved ? JSON.parse(saved) : INITIAL_QA_POSTS;
+  });
+
+  // Tự động đồng bộ vào LocalStorage mỗi khi người dùng thay đổi dữ liệu
+  useEffect(() => {
+    try {
+      localStorage.setItem('studyez_todayXp', String(todayXp));
+      localStorage.setItem('studyez_streakDays', String(streakDays));
+      localStorage.setItem('studyez_streakUnlocked', String(streakUnlockedToday));
+      localStorage.setItem('studyez_avatarConfig', JSON.stringify(avatarConfig));
+      if (customAvatarUrl) {
+        localStorage.setItem('studyez_customAvatarUrl', customAvatarUrl);
+      } else {
+        localStorage.removeItem('studyez_customAvatarUrl');
+      }
+      if (currentUser) {
+        localStorage.setItem('studyez_currentUser', JSON.stringify(currentUser));
+      }
+      localStorage.setItem('studyez_chapterMcqAnswers', JSON.stringify(chapterMcqAnswers));
+      localStorage.setItem('studyez_qaPosts', JSON.stringify(qaPosts));
+    } catch (err) {
+      console.warn('Bộ nhớ trình duyệt đã đầy hoặc bị chặn:', err);
+    }
+  }, [todayXp, streakDays, streakUnlockedToday, avatarConfig, customAvatarUrl, currentUser, chapterMcqAnswers, qaPosts]);
   const [newQuestionText, setNewQuestionText] = useState('');
   const [newQuestionGrade, setNewQuestionGrade] = useState(9);
   const [newQuestionSubject, setNewQuestionSubject] = useState('math');
