@@ -998,278 +998,2163 @@ function StudentAvatarBadge({ config, customPhoto, streakDays, size = 'md', onCl
 // ==========================================
 // 10. COMPONENT CHÍNH STUDY-EZ 2.0
 // ==========================================
-// DÁN ĐOẠN NÀY VÀO THAY THẾ CHO `export default function App() { ... }` CŨ CỦA BẠN
-
 export default function App() {
-  const [currentPage, setCurrentPage] = useState('home'); 
+  // Điều hướng các màn hình chính
+  const [currentPage, setCurrentPage] = useState('home');
+  // 'home' | 'practice-hub' | 'exam-hub' | 'grade10-hub' | 'specialized-hub' | 'ezask' | 'streak-studio' | 'exam-room' | 'auth'
 
-  // --- 1. HỆ THỐNG XÁC THỰC GMAIL BẮT BUỘC (VIOEDU STYLE) ---
-  const [authMode, setAuthMode] = useState('login'); 
-  const [authInput, setAuthInput] = useState({ email: '', password: '', nickname: '' });
-  const [registeredUsers, setRegisteredUsers] = useState(() => {
-    const saved = localStorage.getItem('studyez_users_db');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('studyez_session_v1');
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  // --- 2. TRẠNG THÁI XP, CỬA HÀNG VÀ HỒ SƠ ---
-  const [userXp, setUserXp] = useState(() => {
-    const saved = localStorage.getItem('studyez_xp_v1');
-    return saved !== null ? Number(saved) : 200; 
-  });
-  const [ownedItems, setOwnedItems] = useState(() => {
-    const saved = localStorage.getItem('studyez_inventory_v1');
-    return saved ? JSON.parse(saved) : ['frame_basic'];
-  });
-  const [equippedFrame, setEquippedFrame] = useState(() => {
-    return localStorage.getItem('studyez_equipped_frame') || 'frame_basic';
-  });
-  const [xpToast, setXpToast] = useState(null);
-
-  // --- 3. HỎI ĐÁP 24/7 (ĐỒNG BỘ LOCALSTORAGE & CHỐNG GIAN LẬN) ---
-  const [qaPosts, setQaPosts] = useState(() => {
-    const saved = localStorage.getItem('studyez_qa_v1');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [newQText, setNewQText] = useState('');
-  const [newQGrade, setNewQGrade] = useState(9);
-  const [newQSubject, setNewQSubject] = useState('math');
-  const [newQBounty, setNewQBounty] = useState(30);
-  const [replyDrafts, setReplyDrafts] = useState({});
-
-  // --- 4. BONG BÓNG KÉO THẢ (DRAGGABLE BUBBLE) ---
-  const [bubblePos, setBubblePos] = useState({ x: window.innerWidth - 180, y: window.innerHeight - 120 });
-
-  // --- BỘ LỌC BÀI TẬP VÀ ĐỀ THI ---
+  // Bộ lọc Chương trình học (120 câu TN + 120 bài TL mỗi chương)
   const [selectedGrade, setSelectedGrade] = useState(9);
   const [selectedSubject, setSelectedSubject] = useState('math');
   const [selectedChapterIdx, setSelectedChapterIdx] = useState(0);
-  const [practiceTab, setPracticeTab] = useState('mcq');
-  
-  // (Các state khác của bạn như phòng thi, lọc độ khó giữ nguyên tại đây...)
+  const [practiceTab, setPracticeTab] = useState('mcq'); // 'mcq' | 'essay'
+  const [difficultyFilter, setDifficultyFilter] = useState('all'); // 'all' | 'Nhận biết' | 'Thông hiểu' | 'Vận dụng' | 'Vận dụng cao'
+  const [currentPageIndex, setCurrentPageIndex] = useState(1);
+  const ITEMS_PER_PAGE = 15;
 
-  // --- 5. EFFECTS ĐỒNG BỘ ĐA THIẾT BỊ ---
+  // Bộ lọc Kỳ thi Định kỳ (55 đề / môn / đợt) & Tuyển sinh 10 (60 đề Sở + 55 đề thi thử + Bài tập ôn)
+  const [selectedTermId, setSelectedTermId] = useState('gk1');
+  const [examSearch, setExamSearch] = useState('');
+  const [g10SubTab, setG10SubTab] = useState('official60'); // 'official60' | 'mock55' | 'topics'
+  const [selectedProvince, setSelectedProvince] = useState('all');
+  const [selectedYear, setSelectedYear] = useState('all');
+
+  // Hệ thống Giữ Chuỗi (Streak) & KPI 200 XP / ngày (Lưu vào LocalStorage)
+  const DAILY_KPI_XP = 200;
+  const [todayXp, setTodayXp] = useState(() => {
+    const saved = localStorage.getItem('studyez_todayXp');
+    return saved !== null ? Number(saved) : 140;
+  });
+  const [streakDays, setStreakDays] = useState(() => {
+    const saved = localStorage.getItem('studyez_streakDays');
+    return saved !== null ? Number(saved) : 7;
+  });
+  const [streakUnlockedToday, setStreakUnlockedToday] = useState(() => {
+    return localStorage.getItem('studyez_streakUnlocked') === 'true';
+  });
+  const [xpToast, setXpToast] = useState(null);
+
+  // Cấu hình Avatar
+  const [avatarConfig, setAvatarConfig] = useState(() => {
+    const saved = localStorage.getItem('studyez_avatarConfig');
+    return saved
+      ? JSON.parse(saved)
+      : { hair: 'boy_neat', outfit: 'uniform_scarf', glasses: true, bgTheme: 'class' };
+  });
+  const [customAvatarUrl, setCustomAvatarUrl] = useState(() => {
+    return localStorage.getItem('studyez_customAvatarUrl') || null;
+  });
+
+  // Tài khoản Người dùng (Mặc định chưa đăng nhập hoặc đọc từ LocalStorage để kiểm tra quyền Hỏi Đáp 24/7 & Ôn Chuyên)
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('studyez_currentUser');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [authForm, setAuthForm] = useState({ nickname: '', email: '' });
+  const [showGmailModal, setShowGmailModal] = useState(false);
+
+  // Trạng thái Gói Hội Viên Ôn Thi Chuyên 59.000đ & Lượt Dùng Thử 1 lần / môn / tài khoản Google
+  const [selectedSpecSubjectId, setSelectedSpecSubjectId] = useState('spec_math');
+  const [activeSpecSessionSubject, setActiveSpecSessionSubject] = useState(null);
+  const [showVipUpgradeModal, setShowVipUpgradeModal] = useState(false);
+  const [vipRegistry, setVipRegistry] = useState(() => {
+    const saved = localStorage.getItem('studyez_vipRegistry');
+    return saved ? JSON.parse(saved) : {}; // { 'email@gmail.com': true }
+  });
+  const [specTrialUsedMap, setSpecTrialUsedMap] = useState(() => {
+    const saved = localStorage.getItem('studyez_specTrialUsedMap');
+    return saved ? JSON.parse(saved) : {}; // { 'email@gmail.com': { spec_math: true, ... } }
+  });
+
+  // Trạng thái làm bài tập Chương
+  const [chapterMcqAnswers, setChapterMcqAnswers] = useState(() => {
+    const saved = localStorage.getItem('studyez_chapterMcqAnswers');
+    return saved ? JSON.parse(saved) : {};
+  });
+  const [chapterEssayDrafts, setChapterEssayDrafts] = useState({});
+  const [revealedEssays, setRevealedEssays] = useState({});
+
+  // Trạng thái Phòng thi (Exam Room)
+  const [activeExam, setActiveExam] = useState(null);
+  const [examMcqAnswers, setExamMcqAnswers] = useState({});
+  const [examEssayAnswers, setExamEssayAnswers] = useState({});
+  const [examSubmitted, setExamSubmitted] = useState(false);
+  const [timeLeftSec, setTimeLeftSec] = useState(5400);
+
+  // Trạng thái Cộng đồng Hỏi Đáp 24/7 (EzAsk)
+  const [qaPosts, setQaPosts] = useState(() => {
+    const saved = localStorage.getItem('studyez_qaPosts');
+    return saved ? JSON.parse(saved) : INITIAL_QA_POSTS;
+  });
+  const [newQuestionText, setNewQuestionText] = useState('');
+  const [newQuestionGrade, setNewQuestionGrade] = useState(9);
+  const [newQuestionSubject, setNewQuestionSubject] = useState('math');
+  const [newQuestionBounty, setNewQuestionBounty] = useState(50);
+  const [newQuestionImage, setNewQuestionImage] = useState(null);
+  const [replyDrafts, setReplyDrafts] = useState({});
+
+  const [quoteIdx, setQuoteIdx] = useState(0);
+
+  // Tự động đồng bộ vào LocalStorage
   useEffect(() => {
-    localStorage.setItem('studyez_users_db', JSON.stringify(registeredUsers));
-    if (currentUser) localStorage.setItem('studyez_session_v1', JSON.stringify(currentUser));
-    else localStorage.removeItem('studyez_session_v1');
-    localStorage.setItem('studyez_xp_v1', String(userXp));
-    localStorage.setItem('studyez_inventory_v1', JSON.stringify(ownedItems));
-    localStorage.setItem('studyez_equipped_frame', equippedFrame);
-    localStorage.setItem('studyez_qa_v1', JSON.stringify(qaPosts));
-  }, [registeredUsers, currentUser, userXp, ownedItems, equippedFrame, qaPosts]);
+    try {
+      localStorage.setItem('studyez_todayXp', String(todayXp));
+      localStorage.setItem('studyez_streakDays', String(streakDays));
+      localStorage.setItem('studyez_streakUnlocked', String(streakUnlockedToday));
+      localStorage.setItem('studyez_avatarConfig', JSON.stringify(avatarConfig));
+      if (customAvatarUrl) {
+        localStorage.setItem('studyez_customAvatarUrl', customAvatarUrl);
+      } else {
+        localStorage.removeItem('studyez_customAvatarUrl');
+      }
+      if (currentUser) {
+        localStorage.setItem('studyez_currentUser', JSON.stringify(currentUser));
+      } else {
+        localStorage.removeItem('studyez_currentUser');
+      }
+      localStorage.setItem('studyez_chapterMcqAnswers', JSON.stringify(chapterMcqAnswers));
+      localStorage.setItem('studyez_qaPosts', JSON.stringify(qaPosts));
+      localStorage.setItem('studyez_vipRegistry', JSON.stringify(vipRegistry));
+      localStorage.setItem('studyez_specTrialUsedMap', JSON.stringify(specTrialUsedMap));
+    } catch (err) {
+      console.warn('Lỗi lưu trữ LocalStorage:', err);
+    }
+  }, [
+    todayXp,
+    streakDays,
+    streakUnlockedToday,
+    avatarConfig,
+    customAvatarUrl,
+    currentUser,
+    chapterMcqAnswers,
+    qaPosts,
+    vipRegistry,
+    specTrialUsedMap
+  ]);
 
+  // Đồng hồ đếm ngược khi vào Phòng thi
   useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === 'studyez_qa_v1' && e.newValue) setQaPosts(JSON.parse(e.newValue));
-      if (e.key === 'studyez_xp_v1' && e.newValue) setUserXp(Number(e.newValue));
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    if (currentPage !== 'exam-room' || examSubmitted) return;
+    const timer = setInterval(() => {
+      setTimeLeftSec((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [currentPage, examSubmitted]);
 
-  const formatTimeAgo = (ts) => {
-    const diff = Math.floor((Date.now() - ts) / 1000);
-    if (diff < 60) return 'Vừa xong';
-    const m = Math.floor(diff / 60);
-    if (m < 60) return `${m} phút trước`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h} giờ trước`;
-    return `${Math.floor(h / 24)} ngày trước`;
+  // Hàm cộng XP
+  const addXp = (amount, reason) => {
+    setTodayXp((prev) => {
+      const next = prev + amount;
+      if (next >= DAILY_KPI_XP && !streakUnlockedToday) {
+        setStreakDays((s) => s + 1);
+        setStreakUnlockedToday(true);
+        setXpToast(`🎉 Đạt đủ KPI 200 XP! Chuỗi ngày học tăng lên ${streakDays + 1} ngày!`);
+      } else {
+        setXpToast(`+${amount} XP (${reason})`);
+      }
+      setTimeout(() => setXpToast(null), 3500);
+      return next;
+    });
   };
 
-  // Kéo thả bong bóng Hỏi Đáp
-  const handleBubbleDragStart = (e) => {
-    e.preventDefault();
-    const startX = e.clientX - bubblePos.x;
-    const startY = e.clientY - bubblePos.y;
-    let moved = false;
-    
-    const handleDrag = (moveEvent) => {
-      moved = true;
-      let newX = Math.max(0, Math.min(moveEvent.clientX - startX, window.innerWidth - 150));
-      let newY = Math.max(0, Math.min(moveEvent.clientY - startY, window.innerHeight - 60));
-      setBubblePos({ x: newX, y: newY });
-    };
-    
-    const handleDrop = () => {
-      window.removeEventListener('mousemove', handleDrag);
-      window.removeEventListener('mouseup', handleDrop);
-      if (!moved) setCurrentPage('ezask'); 
-    };
-    
-    window.addEventListener('mousemove', handleDrag);
-    window.addEventListener('mouseup', handleDrop);
+  // Kiểm tra tài khoản hiện tại có phải Hội viên VIP 59k không
+  const isCurrentUserVip = useMemo(() => {
+    if (!currentUser || !currentUser.email) return false;
+    return Boolean(vipRegistry[currentUser.email]);
+  }, [currentUser, vipRegistry]);
+
+  // Kiểm tra môn chuyên đã dùng hết 1 lượt thử chưa
+  const hasUsedTrialForSubject = (subjId) => {
+    if (!currentUser || !currentUser.email) return false;
+    return Boolean(specTrialUsedMap[currentUser.email]?.[subjId]);
   };
 
-  // Xác thực Form Đăng nhập / Đăng ký
-  const handleAuthSubmit = (e) => {
-    e.preventDefault();
-    const email = authInput.email.trim().toLowerCase();
-    
-    if (!email.endsWith('@gmail.com')) {
-      alert('Hệ thống chỉ hỗ trợ xác thực bằng tài khoản Google (@gmail.com).');
+  // Kích hoạt 1 lần dùng thử duy nhất cho 1 môn chuyên của 1 tài khoản Google
+  const handleStartSingleTrialForSubject = (subjId) => {
+    if (!currentUser || !currentUser.isGoogleVerified) {
+      setCurrentPage('auth');
       return;
     }
-
-    if (authMode === 'register') {
-      if (registeredUsers.find(u => u.email === email)) return alert('Gmail này đã được đăng ký!');
-      const newUser = { email, password: authInput.password, nickname: authInput.nickname.trim() || `@${email.split('@')[0]}` };
-      setRegisteredUsers([...registeredUsers, newUser]);
-      setCurrentUser(newUser);
-    } else {
-      const user = registeredUsers.find(u => u.email === email);
-      if (!user) return alert('Tài khoản chưa tồn tại!');
-      if (user.password !== authInput.password) return alert('Sai mật khẩu!');
-      setCurrentUser(user);
+    const email = currentUser.email;
+    const userTrials = specTrialUsedMap[email] || {};
+    if (userTrials[subjId] && !isCurrentUserVip) {
+      setShowVipUpgradeModal(true);
+      return;
     }
+    // Đánh dấu đã dùng 1 lượt duy nhất của môn này cho tài khoản Google này
+    setSpecTrialUsedMap({
+      ...specTrialUsedMap,
+      [email]: {
+        ...userTrials,
+        [subjId]: true
+      }
+    });
+    setActiveSpecSessionSubject(subjId);
+    addXp(30, 'Mở khóa lượt trải nghiệm Ôn Thi Chuyên');
   };
 
-  // Đăng Câu hỏi 24/7
+  // Nâng cấp gói Hội viên Chuyên 59.000đ
+  const handlePurchaseVip59k = () => {
+    if (!currentUser) {
+      setShowVipUpgradeModal(false);
+      setCurrentPage('auth');
+      return;
+    }
+    setVipRegistry({
+      ...vipRegistry,
+      [currentUser.email]: true
+    });
+    setShowVipUpgradeModal(false);
+    addXp(100, 'Kích hoạt Gói Hội Viên Ôn Chuyên PREMIUM 59K');
+  };
+
+  // Danh sách chương hiện tại
+  const currentChapters = useMemo(() => {
+    return CHAPTER_TITLES[selectedGrade]?.[selectedSubject] || CHAPTER_TITLES[9].math;
+  }, [selectedGrade, selectedSubject]);
+
+  // Sinh 120 câu Trắc nghiệm + 120 bài Tự luận cho chương đang chọn
+  const currentChapterData = useMemo(() => {
+    const title = currentChapters[selectedChapterIdx] || currentChapters[0];
+    return generateChapterExercises120(selectedGrade, selectedSubject, selectedChapterIdx, title);
+  }, [selectedGrade, selectedSubject, selectedChapterIdx, currentChapters]);
+
+  // Lọc theo độ khó và phân trang (120 câu)
+  const filteredMcqs = useMemo(() => {
+    if (difficultyFilter === 'all') return currentChapterData.mcqs;
+    return currentChapterData.mcqs.filter((item) => item.difficulty === difficultyFilter);
+  }, [currentChapterData.mcqs, difficultyFilter]);
+
+  const filteredEssays = useMemo(() => {
+    if (difficultyFilter === 'all') return currentChapterData.essays;
+    return currentChapterData.essays.filter((item) => item.difficulty === difficultyFilter);
+  }, [currentChapterData.essays, difficultyFilter]);
+
+  const activePracticeList = practiceTab === 'mcq' ? filteredMcqs : filteredEssays;
+  const totalPages = Math.max(1, Math.ceil(activePracticeList.length / ITEMS_PER_PAGE));
+  const paginatedPracticeItems = useMemo(() => {
+    const start = (currentPageIndex - 1) * ITEMS_PER_PAGE;
+    return activePracticeList.slice(start, start + ITEMS_PER_PAGE);
+  }, [activePracticeList, currentPageIndex]);
+
+  // Sinh 55 đề thi chính thức cho Khối + Môn + Đợt thi đang chọn
+  const filteredPeriodicExams = useMemo(() => {
+    const all55 = generatePeriodicExams55(selectedTermId, selectedGrade, selectedSubject);
+    if (!examSearch.trim()) return all55;
+    return all55.filter((ex) => ex.title.toLowerCase().includes(examSearch.toLowerCase()));
+  }, [selectedTermId, selectedGrade, selectedSubject, examSearch]);
+
+  // Lọc 60 đề chính thức các Sở GD&ĐT vào lớp 10
+  const filteredGrade10Official = useMemo(() => {
+    return GRADE10_OFFICIAL_EXAMS_60.filter((ex) => {
+      const matchProv = selectedProvince === 'all' || ex.province === selectedProvince;
+      const matchYear = selectedYear === 'all' || ex.year === selectedYear;
+      return matchProv && matchYear;
+    });
+  }, [selectedProvince, selectedYear]);
+
+  // Bắt đầu làm đề thi trong Phòng thi
+  const startExamRoom = (examObj) => {
+    setActiveExam(examObj);
+    setExamMcqAnswers({});
+    setExamEssayAnswers({});
+    setExamSubmitted(false);
+    setTimeLeftSec((examObj.durationMinutes || 90) * 60);
+    setCurrentPage('exam-room');
+  };
+
+  const formatTimer = (sec) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  // Xử lý tải ảnh đại diện
+  const handleAvatarFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCustomAvatarUrl(reader.result);
+      addXp(20, 'Cập nhật ảnh đại diện');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Xử lý tải ảnh đính kèm câu hỏi Hỏi Đáp 24/7
+  const handleQuestionImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setNewQuestionImage(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  // Đăng câu hỏi mới lên Hỏi Đáp 24/7 (BẮT BUỘC ĐĂNG NHẬP)
   const handleCreateQuestion = (e) => {
     e.preventDefault();
-    if (!newQText.trim()) return;
-    if (userXp < newQBounty) return alert('Không đủ XP để treo thưởng!');
+    if (!currentUser) {
+      setCurrentPage('auth');
+      return;
+    }
+    if (!newQuestionText.trim()) return;
     const newPost = {
-      id: `qa-${Date.now()}`, authorEmail: currentUser.email, authorNickname: currentUser.nickname,
-      timestamp: Date.now(), questionText: newQText, grade: newQGrade, subject: newQSubject, bountyXp: newQBounty, answers: []
+      id: 'qa-' + Date.now(),
+      authorNickname: currentUser.nickname,
+      grade: newQuestionGrade,
+      subject: newQuestionSubject,
+      bountyXp: Number(newQuestionBounty),
+      createdAt: 'Vừa xong',
+      questionText: newQuestionText,
+      imageAttachment: newQuestionImage,
+      answers: []
     };
     setQaPosts([newPost, ...qaPosts]);
-    setUserXp(prev => prev - newQBounty); 
-    setNewQText('');
+    setNewQuestionText('');
+    setNewQuestionImage(null);
+    addXp(15, 'Đăng câu hỏi Hỏi Đáp 24/7');
   };
 
-  // Chống tự hỏi tự trả lời
+  // Gửi câu trả lời trên Hỏi Đáp 24/7 (BẮT BUỘC ĐĂNG NHẬP)
   const handleSendReply = (postId) => {
+    if (!currentUser) {
+      setCurrentPage('auth');
+      return;
+    }
     const text = replyDrafts[postId];
     if (!text || !text.trim()) return;
-    const postIndex = qaPosts.findIndex(p => p.id === postId);
-    if (postIndex === -1) return;
-    const post = qaPosts[postIndex];
-
-    if (post.authorEmail === currentUser.email) return alert('CẢNH BÁO: Không thể tự trả lời câu hỏi của chính mình để cày XP!');
-
-    const updatedPosts = [...qaPosts];
-    updatedPosts[postIndex].answers.push({
-      id: `ans-${Date.now()}`, responderEmail: currentUser.email, responderNickname: currentUser.nickname,
-      timestamp: Date.now(), content: text
-    });
-    setQaPosts(updatedPosts);
+    setQaPosts(
+      qaPosts.map((post) => {
+        if (post.id !== postId) return post;
+        return {
+          ...post,
+          answers: [
+            ...post.answers,
+            {
+              id: 'ans-' + Date.now(),
+              responderNickname: currentUser.nickname,
+              content: text,
+              upvotes: 1,
+              isBestAnswer: false,
+              time: 'Vừa xong'
+            }
+          ]
+        };
+      })
+    );
     setReplyDrafts({ ...replyDrafts, [postId]: '' });
-    setUserXp(prev => prev + post.bountyXp);
+    addXp(40, 'Giải bài giúp bạn trên Hỏi Đáp 24/7');
   };
 
-  // ------------------------------------------
-  // RENDER UI MÀN HÌNH ĐĂNG NHẬP
-  // ------------------------------------------
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-slate-100 flex flex-col justify-center items-center p-4">
-        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 border border-slate-200 space-y-6">
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">StudyEz 1.0</h1>
-            <p className="text-xs text-slate-500 font-bold uppercase">Nền Tảng Ôn Luyện Chuẩn Bộ GD&ĐT</p>
-          </div>
-          <div className="flex bg-slate-100 p-1 rounded-2xl">
-            <button onClick={() => setAuthMode('login')} className={`flex-1 py-2.5 rounded-xl text-xs font-black transition ${authMode === 'login' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}>Đăng Nhập</button>
-            <button onClick={() => setAuthMode('register')} className={`flex-1 py-2.5 rounded-xl text-xs font-black transition ${authMode === 'register' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}>Đăng Ký Mới</button>
-          </div>
-          <form onSubmit={handleAuthSubmit} className="space-y-4">
-            {authMode === 'register' && (
-              <input type="text" required value={authInput.nickname} onChange={e => setAuthInput({...authInput, nickname: e.target.value})} placeholder="Nickname hiển thị" className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold" />
-            )}
-            <input type="email" required value={authInput.email} onChange={e => setAuthInput({...authInput, email: e.target.value})} placeholder="Tài khoản @gmail.com" className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold" />
-            <input type="password" required value={authInput.password} onChange={e => setAuthInput({...authInput, password: e.target.value})} placeholder="Mật khẩu" className="w-full px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold" />
-            <button type="submit" className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs transition shadow-md">
-              {authMode === 'login' ? 'Vào Học Ngay' : 'Tạo Tài Khoản & Nhận Quà'}
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  const kpiPercentage = Math.min(100, Math.round((todayXp / DAILY_KPI_XP) * 100));
+  const currentSpecSubjectObj =
+    SPECIALIZED_SUBJECTS.find((s) => s.id === selectedSpecSubjectId) || SPECIALIZED_SUBJECTS[0];
 
-  // ------------------------------------------
-  // RENDER UI CHÍNH CHO ỨNG DỤNG SAU KHI ĐĂNG NHẬP
-  // ------------------------------------------
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans relative pb-20">
-      
-      {/* VỊ TRÍ CHỪA QUẢNG CÁO BANNER */}
-      <div className="w-full bg-slate-200 border-b border-slate-300 py-2 flex justify-center items-center text-[10px] text-slate-500 font-bold tracking-wider">
-        [AD BANNER SLOT - 728x90] Dành cho Quảng cáo Sách hoặc Các Khóa Học Đối Tác
-      </div>
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans">
+      {/* Thông báo cộng XP nổi */}
+      {xpToast && (
+        <div className="fixed top-24 right-5 z-50 bg-blue-700 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-xs font-extrabold animate-bounce">
+          <Sparkles className="w-4 h-4 text-amber-300" />
+          <span>{xpToast}</span>
+        </div>
+      )}
 
-      <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <span className="text-xl font-black text-blue-700">StudyEz 1.0</span>
-            <nav className="hidden lg:flex items-center gap-2 text-[11px] font-black uppercase">
-              <button onClick={() => setCurrentPage('home')} className="px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Trang chủ</button>
-              <button onClick={() => setCurrentPage('profile')} className="px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Hồ sơ cá nhân</button>
-              <button onClick={() => setCurrentPage('shop')} className="px-3 py-2 text-amber-700 hover:bg-amber-50 rounded-lg">Cửa hàng XP</button>
+      {/* ========================================== */}
+      {/* MODAL MUA GÓI HỘI VIÊN ÔN THI CHUYÊN 59.000Đ */}
+      {/* ========================================== */}
+      {showVipUpgradeModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 border-2 border-amber-400 shadow-2xl space-y-5 relative">
+            <div className="flex items-center justify-between">
+              <div className="inline-flex items-center gap-2 bg-amber-100 text-amber-900 px-3 py-1 rounded-full text-xs font-black">
+                <Crown className="w-4 h-4 text-amber-600 fill-amber-500" />
+                <span>GÓI HỘI VIÊN ÔN THI CHUYÊN PREMIUM</span>
+              </div>
+              <button
+                onClick={() => setShowVipUpgradeModal(false)}
+                className="text-slate-400 hover:text-slate-700 font-bold text-sm"
+              >
+                ✕ Đóng
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-slate-900">
+                Mở Khóa Toàn Bộ Kho Ôn Thi Chuyên Chỉ Với <span className="text-amber-600">59.000đ</span>
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Tài khoản Google của bạn đã sử dụng hết <strong>01 lượt trải nghiệm miễn phí</strong> cho môn chuyên này. Đăng ký Gói Hội Viên 59K để mở khóa không giới hạn toàn bộ 5 môn Chuyên:
+              </p>
+            </div>
+
+            <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 space-y-2 text-xs">
+              <div className="flex items-center gap-2 font-bold text-slate-800">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Full Chuyên đề tự luận nâng cao: Toán, Anh, Lý, Hóa, Sinh Chuyên</span>
+              </div>
+              <div className="flex items-center gap-2 font-bold text-slate-800">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Bộ Đề thi Chuyên chính thức các Sở GD&ĐT & Trường Chuyên qua các năm</span>
+              </div>
+              <div className="flex items-center gap-2 font-bold text-slate-800">
+                <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Lời giải chi tiết từng bước chấm điểm chuẩn Bộ GD&ĐT (Mua 1 lần dùng mãi mãi)</span>
+              </div>
+            </div>
+
+            <div className="bg-slate-100 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <div className="text-[11px] font-bold text-slate-500 uppercase">Phí hội viên trọn gói</div>
+                <div className="text-2xl font-black text-blue-700">59.000 VNĐ</div>
+              </div>
+              <div className="text-right text-[11px] text-slate-500">
+                Tài khoản: <strong className="text-slate-800">{currentUser?.email || 'Chưa đăng nhập'}</strong>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handlePurchaseVip59k}
+                className="flex-1 py-3.5 px-5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-xs shadow-lg hover:opacity-95 active:scale-95 transition"
+              >
+                Xác Nhận Thanh Toán 59.000đ & Mở Khóa Ngay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================== */}
+      {/* BONG BÓNG TRÒN NỔI HỎI ĐÁP 24/7 */}
+      {/* ========================================== */}
+      <button
+        onClick={() => setCurrentPage('ezask')}
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 bg-gradient-to-r from-orange-500 to-rose-600 text-white px-4 py-3.5 rounded-full shadow-xl hover:scale-105 active:scale-95 transition-all duration-150 border-2 border-white"
+        title="Mở Hỏi Đáp 24/7"
+      >
+        <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-white/20">
+          <MessageCircle className="w-5 h-5" />
+          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-white animate-ping" />
+        </div>
+        <div className="text-left pr-1">
+          <div className="text-xs font-extrabold leading-tight">HỎI ĐÁP 24/7</div>
+          <div className="text-[10px] text-orange-100 leading-tight">Đăng bài & Giải bài +40 XP</div>
+        </div>
+      </button>
+
+      {/* ========================================== */}
+      {/* THANH ĐIỀU HƯỚNG CHÍNH (NAVBAR) */}
+      {/* ========================================== */}
+      <header className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-2">
+          {/* Logo Mới của StudyEz */}
+          <div className="flex items-center gap-4">
+            <StudyEzBrandLogo onClick={() => setCurrentPage('home')} />
+
+            {/* Menu điều hướng */}
+            <nav className="hidden xl:flex items-center gap-1.5 text-xs font-bold">
+              <button
+                onClick={() => setCurrentPage('home')}
+                className={`px-3 py-2 rounded-xl active:scale-95 transition ${
+                  currentPage === 'home' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Trang chủ
+              </button>
+              <button
+                onClick={() => setCurrentPage('practice-hub')}
+                className={`px-3 py-2 rounded-xl active:scale-95 transition ${
+                  currentPage === 'practice-hub' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Bài Tập (120 Câu/Chương)
+              </button>
+              <button
+                onClick={() => setCurrentPage('exam-hub')}
+                className={`px-3 py-2 rounded-xl active:scale-95 transition ${
+                  currentPage === 'exam-hub' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Đề Thi GK & HK (55 Đề/Môn)
+              </button>
+              <button
+                onClick={() => setCurrentPage('grade10-hub')}
+                className={`px-3 py-2 rounded-xl active:scale-95 transition ${
+                  currentPage === 'grade10-hub'
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100'
+                }`}
+              >
+                Ôn Thi Vào 10 (60+ Đề Sở)
+              </button>
+
+              {/* MỤC MỚI: ÔN THI CHUYÊN (MÀU SÁNG NỔI BẬT + CHỮ PREMIUM Ở DƯỚI) */}
+              <button
+                onClick={() => setCurrentPage('specialized-hub')}
+                className={`px-3.5 py-1.5 rounded-2xl flex flex-col items-center justify-center border-2 transition-all duration-150 shadow-sm active:scale-95 ${
+                  currentPage === 'specialized-hub'
+                    ? 'bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-300 border-amber-500 text-slate-900'
+                    : 'bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 border-amber-400 text-amber-950 hover:from-amber-200 hover:to-yellow-100'
+                }`}
+              >
+                <div className="flex items-center gap-1 text-xs font-black leading-tight">
+                  <Crown className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
+                  <span>Ôn Thi Chuyên</span>
+                </div>
+                <span className="text-[9px] font-black tracking-widest uppercase bg-amber-500 text-white px-2 py-0.2 rounded-full mt-0.5 shadow-2xs">
+                  PREMIUM
+                </span>
+              </button>
+
+              {/* Nút Hỏi Đáp 24/7 */}
+              <button
+                onClick={() => setCurrentPage('ezask')}
+                className={`px-3 py-2 rounded-xl flex items-center gap-1.5 active:scale-95 transition shadow-xs ${
+                  currentPage === 'ezask'
+                    ? 'bg-orange-600 text-white'
+                    : 'bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-95'
+                }`}
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Hỏi Đáp 24/7</span>
+              </button>
             </nav>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="bg-amber-100 text-amber-900 font-black text-xs px-3 py-1.5 rounded-full">{userXp} XP</span>
-            <span className="font-bold text-xs text-blue-700">{currentUser.nickname}</span>
+
+          {/* Khu vực KPI 200 XP + Avatar + Tài khoản Google */}
+          <div className="flex items-center gap-2.5">
+            <div
+              onClick={() => setCurrentPage('streak-studio')}
+              className="hidden sm:flex flex-col bg-slate-100 hover:bg-blue-50/60 px-3 py-1.5 rounded-xl cursor-pointer border border-slate-200 transition w-40"
+            >
+              <div className="flex items-center justify-between text-[10px] font-extrabold">
+                <span className="text-slate-600">KPI Giữ Chuỗi</span>
+                <span className="text-blue-700">
+                  {todayXp}/{DAILY_KPI_XP} XP
+                </span>
+              </div>
+              <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden mt-1">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-600 to-emerald-500 transition-all duration-300"
+                  style={{ width: `${kpiPercentage}%` }}
+                />
+              </div>
+            </div>
+
+            <StudentAvatarBadge
+              config={avatarConfig}
+              customPhoto={customAvatarUrl}
+              streakDays={streakDays}
+              size="md"
+              onClick={() => setCurrentPage('streak-studio')}
+            />
+
+            {currentUser ? (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setCurrentPage('auth')}
+                  className="text-xs font-extrabold px-3 py-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 flex items-center gap-1"
+                >
+                  <span>{currentUser.nickname}</span>
+                  {isCurrentUserVip && (
+                    <span className="bg-amber-400 text-slate-900 text-[9px] px-1.5 py-0.2 rounded-full font-black">
+                      VIP
+                    </span>
+                  )}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setCurrentPage('auth')}
+                className="text-xs font-extrabold bg-blue-600 text-white px-3.5 py-2.5 rounded-xl hover:bg-blue-700 active:scale-95 transition flex items-center gap-1.5 shadow-xs"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>Đăng nhập Google</span>
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* Thanh menu phụ cho màn hình nhỏ */}
+        <div className="xl:hidden flex items-center gap-2 overflow-x-auto px-4 py-2 bg-slate-50 border-t border-slate-200 text-xs font-bold">
+          <button onClick={() => setCurrentPage('home')} className="px-2.5 py-1 rounded-lg bg-white border">
+            Trang chủ
+          </button>
+          <button onClick={() => setCurrentPage('practice-hub')} className="px-2.5 py-1 rounded-lg bg-white border">
+            120 Câu/Chương
+          </button>
+          <button onClick={() => setCurrentPage('exam-hub')} className="px-2.5 py-1 rounded-lg bg-white border">
+            55 Đề GK/HK
+          </button>
+          <button onClick={() => setCurrentPage('grade10-hub')} className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200">
+            Ôn Thi Vào 10
+          </button>
+          <button
+            onClick={() => setCurrentPage('specialized-hub')}
+            className="px-3 py-1 rounded-lg bg-amber-100 text-amber-900 border border-amber-400 font-black flex items-center gap-1"
+          >
+            <Crown className="w-3 h-3 text-amber-600" />
+            <span>Ôn Chuyên (PREMIUM)</span>
+          </button>
+          <button onClick={() => setCurrentPage('ezask')} className="px-2.5 py-1 rounded-lg bg-orange-500 text-white">
+            Hỏi Đáp 24/7
+          </button>
         </div>
       </header>
 
-      {/* BONG BÓNG KÉO THẢ 24/7 */}
-      <div
-        onMouseDown={handleBubbleDragStart}
-        style={{ left: `${bubblePos.x}px`, top: `${bubblePos.y}px` }}
-        className="fixed z-50 flex items-center gap-2 bg-gradient-to-r from-orange-500 to-rose-500 text-white pl-2 pr-4 py-2 rounded-full shadow-2xl border-2 border-white cursor-move"
-      >
-        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center relative">
-          <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-emerald-400 border-2 border-white rounded-full animate-pulse"></span>
+      {/* ========================================== */}
+      {/* VỊ TRÍ QUẢNG CÁO TOP LEADERBOARD */}
+      {/* ========================================== */}
+      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-3">
+        <div className="w-full py-2 px-4 rounded-xl border border-dashed border-slate-300 bg-white/80 flex items-center justify-between text-xs text-slate-400">
+          <span className="font-bold text-[10px] uppercase tracking-wider bg-slate-100 text-slate-500 px-2 py-0.5 rounded">
+            Vị trí Quảng cáo (Ad Slot 728×90)
+          </span>
+          <span>Không gian dành cho Google AdSense hoặc Banner Sách Ôn Thi Chuyên & Vào 10</span>
+          <span className="text-[11px] font-semibold text-blue-600">studyez.vn</span>
         </div>
-        <div className="text-[11px] font-black leading-tight">Hỏi Đáp 24/7</div>
       </div>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
-        
+      {/* ========================================== */}
+      {/* NỘI DUNG CHÍNH CỦA WEBSITE */}
+      {/* ========================================== */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* ------------------------------------------ */}
+        {/* MÀN HÌNH 1: TRANG CHỦ (HOME) */}
+        {/* ------------------------------------------ */}
         {currentPage === 'home' && (
-           <div className="bg-white p-8 text-center border rounded-2xl shadow-sm">
-             <h2 className="text-2xl font-black">Tính năng Đăng nhập & Lưu Profile đã hoạt động!</h2>
-             <p className="text-sm text-slate-500 mt-2">Dữ liệu 3000 dòng đề thi cũ của bạn vẫn được giữ nguyên phía trên đoạn code này. Hãy gọi các dữ liệu đó ra để hiển thị nhé!</p>
-           </div>
+          <div className="space-y-8">
+            {/* Hero Banner */}
+            <section className="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 rounded-3xl p-6 md:p-10 text-white shadow-md grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+              <div className="lg:col-span-8 space-y-4">
+                <div className="inline-flex items-center gap-2 text-xs font-extrabold bg-white/15 px-3.5 py-1 rounded-full">
+                  <span>Chuẩn Chương Trình GDPT Mới • Xác Thực Đề Chính Thức Các Trường & Sở GD&ĐT</span>
+                </div>
+                <h1 className="text-2xl sm:text-4xl font-black leading-tight">
+                  Hệ Thống Luyện Bài Tập Chuyên Sâu, Phòng Thi Thử & Ôn Thi Chuyên Lớp 6, 7, 8, 9
+                </h1>
+                <p className="text-blue-100 text-sm sm:text-base leading-relaxed">
+                  <strong>120 Câu Trắc nghiệm & 120 Bài Tự luận</strong> phân hóa 4 cấp độ cho từng chương • <strong>55 Đề chính thức</strong> cho mỗi môn từng đợt GK/HK • <strong>60 Đề Sở GD&ĐT + 55 Đề thi thử vào 10</strong> • Đặc quyền <strong>Ôn Thi Chuyên PREMIUM</strong>.
+                </p>
+                <div className="flex flex-wrap gap-3 pt-1">
+                  <button
+                    onClick={() => setCurrentPage('practice-hub')}
+                    className="bg-white text-blue-700 font-extrabold px-5 py-3 rounded-xl shadow-xs hover:bg-blue-50 active:scale-95 transition text-xs sm:text-sm"
+                  >
+                    Luyện 120 Câu / Chương
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage('specialized-hub')}
+                    className="bg-gradient-to-r from-amber-300 via-yellow-300 to-amber-400 text-slate-900 font-black px-5 py-3 rounded-xl shadow-md hover:opacity-95 active:scale-95 transition text-xs sm:text-sm flex items-center gap-2 border border-white"
+                  >
+                    <Crown className="w-4 h-4 text-amber-700 fill-amber-600" />
+                    <span>Ôn Thi Chuyên (PREMIUM 59K)</span>
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage('grade10-hub')}
+                    className="bg-indigo-900/80 text-white font-extrabold px-5 py-3 rounded-xl border border-indigo-300/40 hover:bg-indigo-900 active:scale-95 transition text-xs sm:text-sm"
+                  >
+                    Ôn Thi Vào 10 (60 Đề Sở + 55 Đề Thử)
+                  </button>
+                </div>
+              </div>
+
+              {/* Thẻ Nhân vật Giữ Chuỗi */}
+              <div className="lg:col-span-4 bg-white/10 backdrop-blur-xs border border-white/20 rounded-2xl p-5 flex flex-col items-center text-center space-y-3">
+                <StudentAvatarBadge
+                  config={avatarConfig}
+                  customPhoto={customAvatarUrl}
+                  streakDays={streakDays}
+                  size="lg"
+                  onClick={() => setCurrentPage('streak-studio')}
+                />
+                <div className="w-full space-y-1">
+                  <div className="flex justify-between text-xs font-bold">
+                    <span>Tiến độ giữ chuỗi hôm nay</span>
+                    <span>{todayXp} / 200 XP</span>
+                  </div>
+                  <div className="w-full h-2.5 bg-blue-950/50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-amber-400 transition-all duration-300"
+                      style={{ width: `${kpiPercentage}%` }}
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-blue-100 italic">
+                  "{QUOTES[quoteIdx].text}" — {QUOTES[quoteIdx].author}
+                </p>
+                <button
+                  onClick={() => setCurrentPage('streak-studio')}
+                  className="w-full py-2 rounded-xl bg-white/20 hover:bg-white/30 text-xs font-extrabold active:scale-95 transition"
+                >
+                  Tùy chỉnh Avatar & Tải ảnh từ máy
+                </button>
+              </div>
+            </section>
+
+            {/* BANNER SÁNG NỔI BẬT CHO MỤC ÔN THI CHUYÊN PREMIUM */}
+            <section className="bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 border-2 border-amber-300 rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6">
+              <div className="space-y-2 max-w-2xl">
+                <div className="inline-flex items-center gap-2 bg-amber-400 text-slate-950 text-[11px] font-black px-3 py-1 rounded-full">
+                  <Crown className="w-3.5 h-3.5 fill-slate-950" />
+                  <span>PREMIUM • CHUYÊN ĐỀ & ĐỀ THI CHUYÊN CÁC SỞ GD&ĐT</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900">
+                  Khu Vực Ôn Thi Chuyên: Toán • Tiếng Anh • Vật Lý • Hóa Học • Sinh Học
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                  Tổng hợp đầy đủ các chuyên đề tự luận nâng cao và đề thi chính thức vào các trường THPT Chuyên trên toàn quốc (Hà Nội - Amsterdam, Chuyên KHTN, Lê Hồng Phong TP.HCM, Lương Thế Vinh Đồng Nai, Phan Bội Châu...). <strong>Mỗi tài khoản Google được dùng thử miễn phí 1 lần cho từng môn!</strong>
+                </p>
+              </div>
+              <div className="flex flex-col items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setCurrentPage('specialized-hub')}
+                  className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-xs sm:text-sm shadow-md hover:opacity-95 active:scale-95 transition"
+                >
+                  Khám Phá Kho Ôn Chuyên Ngay →
+                </button>
+                <span className="text-[11px] font-extrabold text-amber-800">
+                  Gói Hội Viên Trọn Đời: 59.000đ • Dùng thử 1 lần/môn
+                </span>
+              </div>
+            </section>
+
+            {/* Chọn 4 Khối lớp */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-black text-slate-900">
+                  1. Chọn Khối Lớp (120 Câu Trắc Nghiệm + 120 Tự Luận Mỗi Chương)
+                </h2>
+                <span className="text-xs font-bold text-blue-600">Độ khó phân hóa 4 cấp độ</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {GRADES.map((g) => (
+                  <div
+                    key={g.id}
+                    className="bg-white rounded-2xl p-5 border border-slate-200 hover:border-blue-500 shadow-xs transition flex flex-col justify-between space-y-4"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-black text-blue-700">{g.label}</span>
+                        <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full">
+                          240 Bài/Chương
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-extrabold text-slate-900">{g.title}</h3>
+                      <p className="text-xs text-slate-500 leading-relaxed">{g.desc}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                      <button
+                        onClick={() => {
+                          setSelectedGrade(g.id);
+                          setSelectedChapterIdx(0);
+                          setCurrentPage('practice-hub');
+                        }}
+                        className="py-2 px-3 rounded-xl bg-blue-600 text-white text-xs font-extrabold hover:bg-blue-700 active:scale-95 transition"
+                      >
+                        Làm bài tập
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedGrade(g.id);
+                          setCurrentPage('exam-hub');
+                        }}
+                        className="py-2 px-3 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-extrabold hover:bg-indigo-100 active:scale-95 transition"
+                      >
+                        55 Đề thi/môn
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
         )}
 
+        {/* ------------------------------------------ */}
+        {/* MÀN HÌNH 2: KHO BÀI TẬP 96 CHƯƠNG (120 CÂU TN + 120 BÀI TL / CHƯƠNG) */}
+        {/* ------------------------------------------ */}
+        {currentPage === 'practice-hub' && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <aside className="lg:col-span-4 space-y-4">
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
+                <h2 className="text-base font-black text-slate-900">Chọn Khối & Môn Học</h2>
+                <div className="grid grid-cols-4 gap-2">
+                  {[6, 7, 8, 9].map((g) => (
+                    <button
+                      key={g}
+                      onClick={() => {
+                        setSelectedGrade(g);
+                        setSelectedChapterIdx(0);
+                        setCurrentPageIndex(1);
+                      }}
+                      className={`py-2 rounded-xl text-xs font-extrabold transition ${
+                        selectedGrade === g
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      Lớp {g}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  {SUBJECTS.filter((s) => s.status === 'active').map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => {
+                        setSelectedSubject(s.id);
+                        setSelectedChapterIdx(0);
+                        setCurrentPageIndex(1);
+                      }}
+                      className={`py-2 px-2 rounded-xl text-xs font-extrabold transition ${
+                        selectedSubject === s.id
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {s.id === 'math' ? 'Toán học' : s.id === 'science' ? 'KHTN' : 'Tiếng Anh'}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 space-y-2">
+                  <div className="text-xs font-extrabold text-slate-500 uppercase">
+                    Danh sách chương (Lớp {selectedGrade})
+                  </div>
+                  <div className="space-y-1.5 max-h-96 overflow-y-auto pr-1">
+                    {currentChapters.map((chapTitle, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setSelectedChapterIdx(idx);
+                          setCurrentPageIndex(1);
+                        }}
+                        className={`w-full text-left p-3 rounded-xl text-xs font-bold transition flex items-center justify-between gap-2 ${
+                          selectedChapterIdx === idx
+                            ? 'bg-blue-50 text-blue-700 border border-blue-300'
+                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div>
+                          <div className="line-clamp-2">{chapTitle}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            120 Trắc nghiệm • 120 Tự luận
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </aside>
+
+            <section className="lg:col-span-8 space-y-4">
+              {/* Header Chương & Tab chọn Trắc nghiệm / Tự luận */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <span className="text-xs font-extrabold text-blue-600">
+                      Lớp {selectedGrade} • Phân hóa 4 cấp độ từ Cơ bản đến Vận dụng cao
+                    </span>
+                    <h1 className="text-lg font-black text-slate-900 mt-0.5">
+                      {currentChapters[selectedChapterIdx]}
+                    </h1>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setPracticeTab('mcq');
+                        setCurrentPageIndex(1);
+                      }}
+                      className={`px-4 py-2 rounded-xl text-xs font-extrabold transition ${
+                        practiceTab === 'mcq'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      Trắc nghiệm ({currentChapterData.mcqs.length} câu)
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPracticeTab('essay');
+                        setCurrentPageIndex(1);
+                      }}
+                      className={`px-4 py-2 rounded-xl text-xs font-extrabold transition ${
+                        practiceTab === 'essay'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      Bài tập Tự luận ({currentChapterData.essays.length} bài)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bộ lọc 4 mức độ khó */}
+                <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
+                  <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                    <Filter className="w-3.5 h-3.5" /> Lọc độ khó:
+                  </span>
+                  {[
+                    { id: 'all', label: 'Tất cả (120 câu)' },
+                    { id: 'Nhận biết', label: 'Nhận biết (Câu 1-30)' },
+                    { id: 'Thông hiểu', label: 'Thông hiểu (Câu 31-60)' },
+                    { id: 'Vận dụng', label: 'Vận dụng (Câu 61-90)' },
+                    { id: 'Vận dụng cao', label: 'Khó / Vận dụng cao (Câu 91-120)' }
+                  ].map((lv) => (
+                    <button
+                      key={lv.id}
+                      onClick={() => {
+                        setDifficultyFilter(lv.id);
+                        setCurrentPageIndex(1);
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition ${
+                        difficultyFilter === lv.id
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {lv.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Thanh Phân trang trên */}
+              <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-600">
+                  Đang hiển thị trang <strong>{currentPageIndex}</strong> / {totalPages} (Tổng{' '}
+                  <strong>{activePracticeList.length}</strong> bài)
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    disabled={currentPageIndex <= 1}
+                    onClick={() => setCurrentPageIndex((p) => Math.max(1, p - 1))}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 font-bold disabled:opacity-40 hover:bg-slate-100"
+                  >
+                    ← Trang trước
+                  </button>
+                  <button
+                    disabled={currentPageIndex >= totalPages}
+                    onClick={() => setCurrentPageIndex((p) => Math.min(totalPages, p + 1))}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 font-bold disabled:opacity-40 hover:bg-slate-100"
+                  >
+                    Trang sau →
+                  </button>
+                </div>
+              </div>
+
+              {/* Danh sách câu hỏi Trắc nghiệm */}
+              {practiceTab === 'mcq' && (
+                <div className="space-y-4">
+                  {paginatedPracticeItems.map((q) => {
+                    const chosen = chapterMcqAnswers[q.id];
+                    const isAnswered = chosen !== undefined;
+                    const isCorrect = chosen === q.correctIndex;
+                    return (
+                      <div key={q.id} className="bg-white p-5 rounded-2xl border border-slate-200 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`text-xs font-extrabold px-2.5 py-0.5 rounded-md ${
+                              q.difficulty === 'Vận dụng cao'
+                                ? 'bg-rose-100 text-rose-800'
+                                : q.difficulty === 'Vận dụng'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-blue-50 text-blue-700'
+                            }`}
+                          >
+                            Câu {q.index}/120 • Mức độ: {q.difficulty}
+                          </span>
+                          <span className="text-xs font-bold text-emerald-600">+{q.xpReward} XP</span>
+                        </div>
+                        <p className="font-bold text-slate-900 text-sm">{q.question}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {q.options.map((opt, oIdx) => {
+                            const selectedThis = chosen === oIdx;
+                            return (
+                              <button
+                                key={oIdx}
+                                onClick={() => {
+                                  setChapterMcqAnswers({ ...chapterMcqAnswers, [q.id]: oIdx });
+                                  if (oIdx === q.correctIndex && chosen === undefined) {
+                                    addXp(q.xpReward, `Giải đúng câu ${q.index}`);
+                                  }
+                                }}
+                                className={`p-3 rounded-xl border text-left text-xs font-semibold transition ${
+                                  !isAnswered
+                                    ? 'border-slate-200 hover:border-blue-400'
+                                    : oIdx === q.correctIndex
+                                    ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold'
+                                    : selectedThis
+                                    ? 'border-rose-400 bg-rose-50 text-rose-900'
+                                    : 'border-slate-200 opacity-60'
+                                }`}
+                              >
+                                <span className="font-extrabold mr-1.5">
+                                  {String.fromCharCode(65 + oIdx)}.
+                                </span>
+                                {opt}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {isAnswered && (
+                          <div
+                            className={`p-3.5 rounded-xl text-xs leading-relaxed ${
+                              isCorrect
+                                ? 'bg-emerald-50 border border-emerald-200 text-emerald-900'
+                                : 'bg-amber-50 border border-amber-200 text-amber-900'
+                            }`}
+                          >
+                            <span className="font-extrabold">
+                              {isCorrect ? '✓ Chính xác! ' : '✗ Chưa đúng. '}
+                            </span>
+                            {q.explanation}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Danh sách 120 bài tập Tự luận */}
+              {practiceTab === 'essay' && (
+                <div className="space-y-4">
+                  {paginatedPracticeItems.map((es) => {
+                    const isShown = revealedEssays[es.id];
+                    return (
+                      <div key={es.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`text-xs font-extrabold px-3 py-1 rounded-md ${
+                              es.difficulty === 'Vận dụng cao'
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-indigo-50 text-indigo-700'
+                            }`}
+                          >
+                            Bài {es.index}/120 • Mức độ: {es.difficulty} ({es.points} điểm)
+                          </span>
+                          <span className="text-xs font-bold text-emerald-600">
+                            +{es.xpReward} XP hoàn thành
+                          </span>
+                        </div>
+                        <p className="text-sm font-bold text-slate-900 whitespace-pre-line leading-relaxed">
+                          {es.problem}
+                        </p>
+                        <textarea
+                          rows={3}
+                          value={chapterEssayDrafts[es.id] || ''}
+                          onChange={(e) =>
+                            setChapterEssayDrafts({ ...chapterEssayDrafts, [es.id]: e.target.value })
+                          }
+                          placeholder="Trình bày các bước biến đổi tự luận của bạn vào đây..."
+                          className="w-full p-3.5 rounded-xl border border-slate-300 text-xs focus:border-blue-600 focus:outline-hidden"
+                        />
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => {
+                              setRevealedEssays({ ...revealedEssays, [es.id]: !isShown });
+                              if (!isShown) addXp(es.xpReward, `Hoàn thành Tự luận bài ${es.index}`);
+                            }}
+                            className="bg-blue-600 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl hover:bg-blue-700 transition"
+                          >
+                            {isShown ? 'Ẩn hướng dẫn chấm' : `Xem Lời Giải & Nhận +${es.xpReward} XP`}
+                          </button>
+                        </div>
+                        {isShown && (
+                          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                            <div className="text-xs font-extrabold text-blue-700">
+                              Hướng dẫn giải & Thang điểm chấm:
+                            </div>
+                            {es.rubric.map((step, i) => (
+                              <p key={i} className="text-xs text-slate-700 leading-relaxed">
+                                • {step}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {/* ------------------------------------------ */}
+        {/* MÀN HÌNH 3: KHO ĐỀ THI ĐỊNH KỲ (55 ĐỀ CHÍNH THỨC / MÔN / ĐỢT) */}
+        {/* ------------------------------------------ */}
+        {currentPage === 'exam-hub' && (
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <span className="text-xs font-extrabold text-blue-600 uppercase">
+                    Ngân hàng Đề Thi Chính Thức Các Trường Toàn Quốc (55 Đề / Môn / Đợt)
+                  </span>
+                  <h1 className="text-2xl font-black text-slate-900 mt-0.5">
+                    Phòng Thi Giữa Kì 1, Cuối Kì 1, Giữa Kì 2, Cuối Kì 2 (Có Năm Học & Tên Trường)
+                  </h1>
+                </div>
+                <input
+                  type="text"
+                  value={examSearch}
+                  onChange={(e) => setExamSearch(e.target.value)}
+                  placeholder="Tìm tên trường hoặc năm học..."
+                  className="px-3.5 py-2 text-xs rounded-xl border border-slate-300 w-64"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {EXAM_TERMS.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setSelectedTermId(t.id)}
+                    className={`p-3.5 rounded-xl border text-left transition ${
+                      selectedTermId === t.id
+                        ? 'border-blue-600 bg-blue-50 text-blue-900'
+                        : 'border-slate-200 bg-slate-50 hover:bg-white'
+                    }`}
+                  >
+                    <div className="text-sm font-extrabold">{t.name}</div>
+                    <div className="text-[11px] text-blue-600 font-bold mt-0.5">{t.badge}</div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+                {[6, 7, 8, 9].map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => setSelectedGrade(g)}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold ${
+                      selectedGrade === g ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    Lớp {g}
+                  </button>
+                ))}
+                <span className="text-slate-300 mx-1">|</span>
+                {SUBJECTS.filter((s) => s.status === 'active').map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setSelectedSubject(s.id)}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold ${
+                      selectedSubject === s.id
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-100 text-slate-700'
+                    }`}
+                  >
+                    {s.name} (55 Đề)
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredPeriodicExams.map((ex) => (
+                <div
+                  key={ex.id}
+                  className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-blue-500 transition flex flex-col justify-between space-y-4"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-extrabold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-md">
+                        {ex.codeNumber}
+                      </span>
+                      <span className="text-amber-800 bg-amber-50 font-bold px-2 py-0.5 rounded">
+                        Năm học {ex.year}
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-extrabold text-slate-900 leading-snug">{ex.title}</h3>
+                    <p className="text-xs text-slate-500">
+                      Trường ra đề: <strong>{ex.school}</strong> • Thời gian: {ex.durationMinutes} phút
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => startExamRoom(ex)}
+                    className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-xs font-extrabold hover:bg-blue-700 active:scale-95 transition"
+                  >
+                    Vào Phòng Thi Chính Thức (+80 XP)
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------ */}
+        {/* MÀN HÌNH 4: ÔN THI TUYỂN SINH LỚP 10 (60 ĐỀ SỞ + 55 ĐỀ THI THỬ + BÀI TẬP ÔN) */}
+        {/* ------------------------------------------ */}
+        {currentPage === 'grade10-hub' && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-indigo-900 to-blue-900 text-white p-6 sm:p-8 rounded-3xl space-y-4">
+              <div className="inline-flex items-center gap-2 text-xs font-extrabold bg-amber-400 text-slate-900 px-3 py-1 rounded-full">
+                <span>Tổ Hợp Ôn Thi Vào Lớp 10 Toàn Diện (100% Tự Luận Chuẩn Cấu Trúc Các Sở GD&ĐT)</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black">
+                60 Đề Thi Chính Thức Các Sở GD&ĐT • 55 Đề Thi Thử Phân Hóa • Chuyên Đề Bài Tập Ôn
+              </h1>
+
+              {/* 3 Phân mục của Ôn thi vào lớp 10 */}
+              <div className="flex flex-wrap gap-2.5 pt-2">
+                <button
+                  onClick={() => setG10SubTab('official60')}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition ${
+                    g10SubTab === 'official60'
+                      ? 'bg-amber-400 text-slate-950 shadow-sm'
+                      : 'bg-white/15 text-white hover:bg-white/25'
+                  }`}
+                >
+                  1. Đề Chính Thức Các Sở GD&ĐT (60 Đề)
+                </button>
+                <button
+                  onClick={() => setG10SubTab('mock55')}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition ${
+                    g10SubTab === 'mock55'
+                      ? 'bg-amber-400 text-slate-950 shadow-sm'
+                      : 'bg-white/15 text-white hover:bg-white/25'
+                  }`}
+                >
+                  2. Đề Thi Thử Vào 10 Full Tự Luận (55 Đề Phân Độ Khó)
+                </button>
+                <button
+                  onClick={() => setG10SubTab('topics')}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition ${
+                    g10SubTab === 'topics'
+                      ? 'bg-amber-400 text-slate-950 shadow-sm'
+                      : 'bg-white/15 text-white hover:bg-white/25'
+                  }`}
+                >
+                  3. Bài Tập Ôn Thi Vào 10 Theo Chuyên Đề
+                </button>
+              </div>
+
+              {g10SubTab === 'official60' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <select
+                    value={selectedProvince}
+                    onChange={(e) => setSelectedProvince(e.target.value)}
+                    className="px-4 py-2.5 rounded-xl bg-white text-slate-900 text-xs font-extrabold"
+                  >
+                    <option value="all">Tất cả 15 Sở GD&ĐT Tỉnh / Thành phố (60 Đề chính thức)</option>
+                    {PROVINCES_15.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                    className="px-4 py-2.5 rounded-xl bg-white text-slate-900 text-xs font-extrabold"
+                  >
+                    <option value="all">Tất cả các năm học gần đây (2022 - 2026)</option>
+                    {EXAM_YEARS_G10.map((y) => (
+                      <option key={y} value={y}>
+                        Năm học {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Tab 1: 60 Đề chính thức các Sở */}
+            {g10SubTab === 'official60' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredGrade10Official.map((ex) => (
+                  <div
+                    key={ex.id}
+                    className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-indigo-500 transition flex flex-col justify-between space-y-4"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-md">
+                          {ex.province}
+                        </span>
+                        <span className="text-amber-800 bg-amber-50 font-extrabold px-2 py-0.5 rounded">
+                          Năm {ex.year}
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-extrabold text-slate-900">{ex.title}</h3>
+                      <p className="text-xs text-slate-500">
+                        100% Tự luận: Bài I (Căn thức), Bài II (Lập PT), Bài III (Vi-ét), Bài IV (Đường tròn), Bài V (Điểm 10)
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => startExamRoom(ex)}
+                      className="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-extrabold hover:bg-indigo-700 transition"
+                    >
+                      Làm Đề Chính Thức & Xem Biểu Điểm
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Tab 2: 55 Đề thi thử vào 10 Full Tự luận phân độ khó */}
+            {g10SubTab === 'mock55' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {GRADE10_MOCK_EXAMS_55.map((ex) => (
+                  <div
+                    key={ex.id}
+                    className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-blue-500 transition flex flex-col justify-between space-y-4"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-extrabold bg-rose-50 text-rose-700 px-2.5 py-0.5 rounded-md">
+                          {ex.difficultyTag}
+                        </span>
+                        <span className="text-slate-500 font-bold">120 phút</span>
+                      </div>
+                      <h3 className="text-sm font-extrabold text-slate-900">{ex.title}</h3>
+                      <p className="text-xs text-slate-500">
+                        Cấu trúc chuẩn 100% Tự luận (5 bài toán lớn có lời giải và thang điểm chi tiết)
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => startExamRoom(ex)}
+                      className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-xs font-extrabold hover:bg-blue-700 transition"
+                    >
+                      Vào Thi Thử Đề Số {ex.index}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Tab 3: Bài tập ôn thi vào 10 theo chuyên đề */}
+            {g10SubTab === 'topics' && (
+              <div className="space-y-6">
+                {GRADE10_PRACTICE_TOPICS.map((topic) => (
+                  <div key={topic.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                      <h3 className="text-base font-black text-slate-900">{topic.title}</h3>
+                      <span className="text-xs font-extrabold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full">
+                        {topic.count}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {topic.exercises.map((ex) => (
+                        <div key={ex.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                          <span className="text-[11px] font-extrabold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
+                            Mức độ: {ex.level}
+                          </span>
+                          <p className="text-xs font-bold text-slate-900 leading-relaxed">{ex.problem}</p>
+                          <p className="text-xs text-emerald-800 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
+                            <strong>Hướng dẫn giải:</strong> {ex.solution}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ------------------------------------------ */}
+        {/* MÀN HÌNH 5: MỤC ÔN THI CHUYÊN (MÀU SÁNG NỔI BẬT - PREMIUM 59K - 1 LẦN/MÔN/GOOGLE ACCOUNT) */}
+        {/* ------------------------------------------ */}
+        {currentPage === 'specialized-hub' && (
+          <div className="space-y-6">
+            {/* Khung Banner Sáng Hoàng Gia (Light Amber/Gold Theme) */}
+            <div className="bg-gradient-to-r from-amber-100 via-yellow-50 to-orange-100 border-2 border-amber-400 rounded-3xl p-6 sm:p-8 shadow-md space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="inline-flex items-center gap-2 bg-amber-500 text-white px-3.5 py-1 rounded-full text-xs font-black shadow-xs">
+                  <Crown className="w-4 h-4 fill-white" />
+                  <span>CHUYÊN MỤC PREMIUM • GÓI HỘI VIÊN 59.000Đ</span>
+                </div>
+                {isCurrentUserVip ? (
+                  <span className="bg-emerald-600 text-white text-xs font-black px-4 py-1.5 rounded-full">
+                    ✓ Tài khoản {currentUser.email} đã mở khóa Hội Viên VIP Trọn Đời
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setShowVipUpgradeModal(true)}
+                    className="bg-slate-900 text-amber-300 text-xs font-black px-4 py-2 rounded-xl hover:bg-slate-800 transition flex items-center gap-1.5"
+                  >
+                    <Crown className="w-3.5 h-3.5" />
+                    <span>Mua Gói Hội Viên 59.000đ (Mở Khóa Vĩnh Viễn)</span>
+                  </button>
+                )}
+              </div>
+
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900">
+                Hệ Thống Ôn Thi Vào Lớp 10 Chuyên (Toán • Anh • Lý • Hóa • Sinh)
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed max-w-4xl">
+                Bài tập tự luận phân chia theo đúng chuyên đề thi Học sinh giỏi & Thi vào các trường THPT Chuyên trọng điểm, kèm <strong>Đề thi Chuyên chính thức của các Sở GD&ĐT</strong> được kiểm chứng chuẩn xác theo từng năm học.
+                <br />
+                <span className="font-extrabold text-amber-900">
+                  ★ Quyền lợi dùng thử: Mỗi tài khoản đăng nhập bằng Google (@gmail.com) được kích hoạt 01 lần học thử miễn phí cho từng môn chuyên!
+                </span>
+              </p>
+
+              {/* Danh sách chọn 5 môn Chuyên Active & các môn Coming Soon */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2">
+                {SPECIALIZED_SUBJECTS.map((sub) => {
+                  const isSoon = sub.status === 'coming_soon';
+                  const isSelected = selectedSpecSubjectId === sub.id;
+                  const usedTrial = hasUsedTrialForSubject(sub.id);
+                  return (
+                    <button
+                      key={sub.id}
+                      disabled={isSoon}
+                      onClick={() => {
+                        setSelectedSpecSubjectId(sub.id);
+                        setActiveSpecSessionSubject(null);
+                      }}
+                      className={`p-3.5 rounded-2xl border-2 text-left transition flex flex-col justify-between ${
+                        isSoon
+                          ? 'bg-white/50 border-slate-200 opacity-60 cursor-not-allowed'
+                          : isSelected
+                          ? 'bg-white border-amber-600 shadow-md'
+                          : 'bg-white/90 border-amber-200 hover:border-amber-400'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-black text-slate-900">{sub.name}</span>
+                        {isSoon ? (
+                          <span className="text-[9px] font-bold bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">
+                            Soon
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-black bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded">
+                            PREMIUM
+                          </span>
+                        )}
+                      </div>
+                      {!isSoon && (
+                        <div className="mt-2 text-[10px] font-bold">
+                          {isCurrentUserVip ? (
+                            <span className="text-emerald-600">✓ Đã mở khóa VIP</span>
+                          ) : usedTrial ? (
+                            <span className="text-rose-600">Đã dùng 1/1 lượt thử</span>
+                          ) : (
+                            <span className="text-blue-700">Còn 1/1 lượt dùng thử</span>
+                          )}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* KIỂM TRA XÁC THỰC GOOGLE & QUYỀN TRUY CẬP MÔN CHUYÊN */}
+            {!currentUser || !currentUser.isGoogleVerified ? (
+              <div className="bg-white p-8 rounded-3xl border-2 border-amber-300 text-center max-w-2xl mx-auto space-y-4 shadow-sm">
+                <div className="w-14 h-14 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+                  <Lock className="w-7 h-7" />
+                </div>
+                <h2 className="text-xl font-black text-slate-900">
+                  Yêu Cầu Xác Thực Bằng Tài Khoản Google Để Vào Mục Ôn Thi Chuyên
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  Vì mỗi tài khoản chỉ được cấp <strong>01 lần dùng thử duy nhất cho từng môn chuyên</strong> (hoặc kích hoạt gói Hội viên 59.000đ), bạn cần đăng nhập và xác thực bằng tài khoản <strong>Google (@gmail.com)</strong> để hệ thống ghi nhận quyền truy cập.
+                </p>
+                <button
+                  onClick={() => setCurrentPage('auth')}
+                  className="inline-flex items-center gap-2 bg-blue-600 text-white text-xs sm:text-sm font-black px-6 py-3.5 rounded-2xl hover:bg-blue-700 shadow-md transition"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>Đăng Nhập Bằng Tài Khoản Google Ngay</span>
+                </button>
+              </div>
+            ) : !isCurrentUserVip && activeSpecSessionSubject !== selectedSpecSubjectId ? (
+              /* Màn hình kích hoạt 1 lượt dùng thử hoặc mua gói 59K */
+              <div className="bg-white p-8 rounded-3xl border-2 border-amber-300 max-w-2xl mx-auto text-center space-y-5 shadow-sm">
+                <div className="inline-flex items-center gap-2 bg-amber-100 text-amber-900 px-3.5 py-1 rounded-full text-xs font-black">
+                  <Crown className="w-4 h-4 text-amber-600" />
+                  <span>{currentSpecSubjectObj.name} • Nội Dung Chất Lượng Cao</span>
+                </div>
+                <h2 className="text-xl font-black text-slate-900">{currentSpecSubjectObj.desc}</h2>
+
+                {hasUsedTrialForSubject(selectedSpecSubjectId) ? (
+                  <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-900 space-y-2">
+                    <div className="font-black text-sm">
+                      Tài khoản Google ({currentUser.email}) đã sử dụng hết 01 lượt dùng thử của môn{' '}
+                      {currentSpecSubjectObj.name}!
+                    </div>
+                    <p>
+                      Để tiếp tục ôn luyện toàn bộ các chuyên đề nâng cao và bộ đề thi Chuyên của các Sở GD&ĐT không giới hạn, vui lòng nâng cấp gói Hội Viên 59.000đ.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 text-xs text-blue-900">
+                    Tài khoản Google <strong>{currentUser.email}</strong> hiện có{' '}
+                    <strong>01 lần dùng thử miễn phí duy nhất</strong> cho môn{' '}
+                    <strong>{currentSpecSubjectObj.name}</strong>.
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  {!hasUsedTrialForSubject(selectedSpecSubjectId) && (
+                    <button
+                      onClick={() => handleStartSingleTrialForSubject(selectedSpecSubjectId)}
+                      className="px-6 py-3.5 rounded-2xl bg-blue-600 text-white text-xs font-black hover:bg-blue-700 transition shadow-sm"
+                    >
+                      Kích Hoạt 1 Lần Dùng Thử Môn {currentSpecSubjectObj.name}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowVipUpgradeModal(true)}
+                    className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-black hover:opacity-95 transition shadow-md"
+                  >
+                    Mua Gói Hội Viên 59.000đ (Mở Khóa Tất Cả Môn Chuyên)
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* HIỂN THỊ NỘI DUNG ÔN THI CHUYÊN CHI TIẾT KHI ĐÃ MỞ KHÓA VIP HOẶC ĐANG TRONG 1 LƯỢT DÙNG THỬ */
+              <div className="space-y-6">
+                <div className="bg-amber-50 border border-amber-300 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="font-bold text-amber-950">
+                    Đang mở kho dữ liệu <strong>{currentSpecSubjectObj.name}</strong> • Nguồn đề chính thức được kiểm chứng từ các Sở GD&ĐT và Bộ GD&ĐT.
+                  </span>
+                  {!isCurrentUserVip && (
+                    <span className="bg-rose-600 text-white px-3 py-1 rounded-full font-extrabold">
+                      Lưu ý: Bạn đang sử dụng lượt trải nghiệm duy nhất (1/1) của môn này
+                    </span>
+                  )}
+                </div>
+
+                {/* Phần 1: Các chương chuyên đề tự luận thi Chuyên */}
+                <div className="space-y-4">
+                  <h2 className="text-lg font-black text-slate-900">
+                    I. Bài Tập Tự Luận Chuyên Sâu Theo Từng Chuyên Đề ({currentSpecSubjectObj.name})
+                  </h2>
+                  {currentSpecSubjectObj.chapters.map((chap) => (
+                    <div key={chap.id} className="bg-white p-6 rounded-2xl border-2 border-amber-200 space-y-4 shadow-2xs">
+                      <h3 className="text-base font-black text-amber-900 border-b border-amber-100 pb-2">
+                        {chap.title}
+                      </h3>
+                      <div className="space-y-4">
+                        {chap.problems.map((prob) => (
+                          <div key={prob.id} className="p-4 rounded-xl bg-amber-50/40 border border-amber-200 space-y-2.5">
+                            <div className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded">
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>Nguồn xác thực: {prob.source}</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-900 whitespace-pre-line leading-relaxed">
+                              {prob.question}
+                            </p>
+                            <div className="p-3.5 rounded-xl bg-white border border-emerald-200 text-xs text-slate-800 leading-relaxed">
+                              <strong className="text-emerald-700 block mb-1">
+                                Hướng dẫn giải & Biểu điểm Chuyên:
+                              </strong>
+                              {prob.solution}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Phần 2: Đề thi Chuyên chính thức của các Sở GD&ĐT theo từng năm */}
+                <div className="space-y-4">
+                  <h2 className="text-lg font-black text-slate-900">
+                    II. Bộ Đề Thi Chuyên Chính Thức Các Sở GD&ĐT & Trường Chuyên Toàn Quốc ({currentSpecSubjectObj.name})
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {currentSpecSubjectObj.officialExams.map((oe) => (
+                      <div
+                        key={oe.id}
+                        className="bg-white p-5 rounded-2xl border-2 border-amber-300 flex flex-col justify-between space-y-4 shadow-xs"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-black bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded">
+                              Năm học {oe.year}
+                            </span>
+                            <span className="text-slate-500 font-bold">{oe.duration} phút</span>
+                          </div>
+                          <h4 className="text-sm font-black text-slate-900">
+                            Đề Thi Chính Thức {currentSpecSubjectObj.name} - {oe.province}
+                          </h4>
+                          <p className="text-xs text-slate-600">
+                            Cấu trúc: {oe.questionsCount} • Đã kiểm chứng đáp án chính thức
+                          </p>
+                        </div>
+                        <button
+                          onClick={() =>
+                            startExamRoom({
+                              id: oe.id,
+                              title: `Đề Thi Chính Thức ${currentSpecSubjectObj.name} - ${oe.province} (${oe.year})`,
+                              durationMinutes: oe.duration,
+                              isGrade10Entrance: true,
+                              mcqs: [],
+                              essays: currentSpecSubjectObj.chapters.flatMap((c, cIdx) =>
+                                c.problems.map((p, pIdx) => ({
+                                  id: `${oe.id}-${cIdx}-${pIdx}`,
+                                  title: `Câu ${cIdx + 1}.${pIdx + 1} (${p.source})`,
+                                  problem: p.question,
+                                  points: 2.5,
+                                  solution: p.solution
+                                }))
+                              )
+                            })
+                          }
+                          className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-black hover:opacity-95 transition"
+                        >
+                          Mở Đề Thi Chuyên Chính Thức
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ------------------------------------------ */}
+        {/* MÀN HÌNH 6: PHÒNG THI THỰC TẾ (EXAM ROOM) */}
+        {/* ------------------------------------------ */}
+        {currentPage === 'exam-room' && activeExam && (
+          <div className="max-w-4xl mx-auto space-y-6">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 sticky top-20 z-20 flex flex-wrap items-center justify-between gap-4 shadow-xs">
+              <div>
+                <span className="text-xs font-extrabold text-blue-600">
+                  {activeExam.isGrade10Entrance
+                    ? 'ĐỀ THI CHÍNH THỨC (100% TỰ LUẬN)'
+                    : 'PHÒNG THI ĐỊNH KỲ CHÍNH THỨC CÁC TRƯỜNG'}
+                </span>
+                <h1 className="text-base font-black text-slate-900">{activeExam.title}</h1>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="px-3.5 py-2 rounded-xl bg-rose-50 text-rose-700 font-black text-sm flex items-center gap-1.5">
+                  <Clock className="w-4 h-4" />
+                  <span>{formatTimer(timeLeftSec)}</span>
+                </div>
+                {!examSubmitted ? (
+                  <button
+                    onClick={() => {
+                      setExamSubmitted(true);
+                      addXp(80, 'Hoàn thành Đề thi chính thức');
+                    }}
+                    className="bg-blue-600 text-white text-xs font-extrabold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition"
+                  >
+                    Nộp Bài & Xem Đáp Án Chính Thức
+                  </button>
+                ) : (
+                  <button
+                    onClick={() =>
+                      setCurrentPage(activeExam.isGrade10Entrance ? 'grade10-hub' : 'exam-hub')
+                    }
+                    className="bg-slate-800 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl"
+                  >
+                    Thoát phòng thi
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {!activeExam.isGrade10Entrance && activeExam.mcqs.length > 0 && (
+              <div className="space-y-4">
+                <h2 className="text-base font-black text-slate-900 bg-blue-50 p-3.5 rounded-xl border border-blue-200">
+                  PHẦN I. TRẮC NGHIỆM KHÁCH QUAN (3,0 ĐIỂM - 12 CÂU HỎI)
+                </h2>
+                {activeExam.mcqs.map((q) => (
+                  <div key={q.id} className="bg-white p-5 rounded-2xl border border-slate-200 space-y-3">
+                    <p className="text-sm font-bold text-slate-900">{q.question}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {q.options.map((opt, oIdx) => (
+                        <button
+                          key={oIdx}
+                          disabled={examSubmitted}
+                          onClick={() => setExamMcqAnswers({ ...examMcqAnswers, [q.id]: oIdx })}
+                          className={`p-3 rounded-xl border text-left text-xs font-semibold transition ${
+                            examMcqAnswers[q.id] === oIdx
+                              ? 'border-blue-600 bg-blue-50 text-blue-900 font-bold'
+                              : 'border-slate-200 hover:border-blue-300'
+                          }`}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                    {examSubmitted && (
+                      <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900">
+                        <span className="font-bold">Đáp án đúng: </span>
+                        {q.options[q.correctIndex]} — {q.explanation}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <h2 className="text-base font-black text-slate-900 bg-indigo-50 p-3.5 rounded-xl border border-indigo-200">
+                {activeExam.isGrade10Entrance
+                  ? 'ĐỀ BÀI CHÍNH THỨC (100% TỰ LUẬN - THANG ĐIỂM 10,0 ĐIỂM)'
+                  : 'PHẦN II. TỰ LUẬN (7,0 ĐIỂM)'}
+              </h2>
+              {activeExam.essays.map((es) => (
+                <div key={es.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-black text-indigo-700">{es.title}</h3>
+                    <span className="text-xs font-bold text-slate-500">{es.points} điểm</span>
+                  </div>
+                  <p className="text-sm text-slate-900 font-semibold whitespace-pre-line leading-relaxed">
+                    {es.problem}
+                  </p>
+                  <textarea
+                    rows={4}
+                    disabled={examSubmitted}
+                    value={examEssayAnswers[es.id] || ''}
+                    onChange={(e) =>
+                      setExamEssayAnswers({ ...examEssayAnswers, [es.id]: e.target.value })
+                    }
+                    placeholder="Trình bày lời giải tự luận từng ý của bạn tại đây..."
+                    className="w-full p-3.5 rounded-xl border border-slate-300 text-xs"
+                  />
+                  {examSubmitted && (
+                    <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 space-y-2 text-xs">
+                      <div className="font-extrabold text-amber-900">
+                        Đáp án & Biểu điểm chấm chính thức:
+                      </div>
+                      <p className="text-slate-800 whitespace-pre-line leading-relaxed">
+                        {es.solution}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------ */}
+        {/* MÀN HÌNH 7: CỘNG ĐỒNG HỎI ĐÁP 24/7 (BẮT BUỘC ĐĂNG NHẬP MỚI ĐƯỢC ĐĂNG & TRẢ LỜI) */}
+        {/* ------------------------------------------ */}
         {currentPage === 'ezask' && (
-          <div className="bg-white p-6 rounded-2xl border border-slate-200">
-             <h2 className="text-lg font-black text-slate-900 mb-4">Cộng Đồng Hỏi Đáp (Đồng bộ Real-Time)</h2>
-             {/* Render Giao diện Hỏi Đáp ở đây */}
-          </div>
-        )}
-        
-        {currentPage === 'shop' && (
-          <div className="bg-white p-6 rounded-2xl border border-slate-200">
-             <h2 className="text-lg font-black text-slate-900 mb-4">Cửa Hàng Avatar & Khung Viền</h2>
-             {/* Render Cửa hàng ở đây */}
-          </div>
-        )}
-        
-        {currentPage === 'profile' && (
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 max-w-md mx-auto">
-             <h2 className="text-lg font-black text-slate-900 mb-4">Tùy Chỉnh Hồ Sơ</h2>
-             <label className="text-xs font-bold block mb-1">Email</label>
-             <input disabled value={currentUser.email} className="w-full p-3 bg-slate-100 rounded-xl mb-4 text-xs font-bold" />
-             <label className="text-xs font-bold block mb-1">Đổi Nickname</label>
-             <input value={currentUser.nickname} onChange={e => setCurrentUser({...currentUser, nickname: e.target.value})} className="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold" />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Cột trái: Kiểm tra đăng nhập trước khi cho phép đăng câu hỏi */}
+            <div className="lg:col-span-5">
+              {!currentUser ? (
+                <div className="bg-white p-6 rounded-2xl border-2 border-orange-300 space-y-4 sticky top-24 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center mx-auto">
+                    <Lock className="w-6 h-6" />
+                  </div>
+                  <h2 className="text-lg font-black text-slate-900">
+                    Cần Đăng Nhập Tài Khoản Để Đăng & Trả Lời Câu Hỏi 24/7
+                  </h2>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Để đảm bảo chất lượng học thuật và cộng điểm XP chính xác cho từng thành viên, bạn cần đăng nhập tài khoản trước khi đăng bài hỏi hoặc gửi lời giải.
+                  </p>
+                  <button
+                    onClick={() => setCurrentPage('auth')}
+                    className="w-full py-3 rounded-xl bg-orange-500 text-white text-xs font-extrabold hover:bg-orange-600 transition"
+                  >
+                    Đăng Nhập Tài Khoản Ngay
+                  </button>
+                </div>
+              ) : (
+                <form
+                  onSubmit={handleCreateQuestion}
+                  className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4 sticky top-24"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MessageCircle className="w-5 h-5 text-orange-500" />
+                      <h2 className="text-base font-black text-slate-900">Đăng Câu Hỏi 24/7</h2>
+                    </div>
+                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">
+                      {currentUser.nickname}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <select
+                      value={newQuestionGrade}
+                      onChange={(e) => setNewQuestionGrade(Number(e.target.value))}
+                      className="p-2 rounded-xl border border-slate-300 text-xs font-bold"
+                    >
+                      {[6, 7, 8, 9].map((g) => (
+                        <option key={g} value={g}>
+                          Lớp {g}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={newQuestionSubject}
+                      onChange={(e) => setNewQuestionSubject(e.target.value)}
+                      className="p-2 rounded-xl border border-slate-300 text-xs font-bold"
+                    >
+                      <option value="math">Toán học</option>
+                      <option value="science">KHTN</option>
+                      <option value="english">Tiếng Anh</option>
+                    </select>
+                    <select
+                      value={newQuestionBounty}
+                      onChange={(e) => setNewQuestionBounty(Number(e.target.value))}
+                      className="p-2 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-extrabold"
+                    >
+                      <option value={30}>Thưởng +30 XP</option>
+                      <option value={50}>Thưởng +50 XP</option>
+                      <option value={100}>Thưởng +100 XP</option>
+                    </select>
+                  </div>
+
+                  <textarea
+                    rows={4}
+                    value={newQuestionText}
+                    onChange={(e) => setNewQuestionText(e.target.value)}
+                    placeholder="Nhập đề bài hoặc câu hỏi bạn đang thắc mắc..."
+                    className="w-full p-3.5 rounded-xl border border-slate-300 text-xs"
+                  />
+
+                  <div className="flex items-center justify-between">
+                    <label className="cursor-pointer inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-xl hover:bg-blue-100">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Đính kèm ảnh đề bài</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleQuestionImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      className="bg-orange-500 text-white text-xs font-extrabold px-5 py-2.5 rounded-xl hover:bg-orange-600 transition"
+                    >
+                      Đăng câu hỏi ngay
+                    </button>
+                  </div>
+                  {newQuestionImage && (
+                    <img
+                      src={newQuestionImage}
+                      alt="Preview"
+                      className="max-h-36 rounded-xl border border-slate-200"
+                    />
+                  )}
+                </form>
+              )}
+            </div>
+
+            {/* Cột phải: Danh sách câu hỏi & Kiểm tra đăng nhập trước khi trả lời */}
+            <div className="lg:col-span-7 space-y-4">
+              {qaPosts.map((post) => (
+                <div key={post.id} className="bg-white p-6 rounded-2xl border border-slate-200 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-extrabold text-blue-700">{post.authorNickname}</span>
+                      <span className="text-slate-400">• {post.createdAt}</span>
+                      <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded">
+                        Lớp {post.grade}
+                      </span>
+                    </div>
+                    <span className="text-xs font-extrabold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full">
+                      Thưởng +{post.bountyXp} XP
+                    </span>
+                  </div>
+
+                  <p className="text-sm font-bold text-slate-900 leading-relaxed">
+                    {post.questionText}
+                  </p>
+                  {post.imageAttachment && (
+                    <img
+                      src={post.imageAttachment}
+                      alt="Đề bài"
+                      className="max-h-60 rounded-xl border border-slate-200"
+                    />
+                  )}
+
+                  <div className="space-y-2.5 pt-2 border-t border-slate-100">
+                    {post.answers.map((ans) => (
+                      <div
+                        key={ans.id}
+                        className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                          ans.isBestAnswer
+                            ? 'bg-emerald-50/70 border-emerald-300'
+                            : 'bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-slate-900">
+                            {ans.responderNickname}
+                          </span>
+                          {ans.isBestAnswer && (
+                            <span className="text-[10px] font-extrabold bg-emerald-600 text-white px-2 py-0.5 rounded-full">
+                              ✓ Lời giải chuẩn xác nhất
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-slate-700 leading-relaxed">{ans.content}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Khu vực trả lời: Yêu cầu đăng nhập nếu chưa có tài khoản */}
+                  {currentUser ? (
+                    <div className="flex gap-2 pt-1">
+                      <input
+                        type="text"
+                        value={replyDrafts[post.id] || ''}
+                        onChange={(e) =>
+                          setReplyDrafts({ ...replyDrafts, [post.id]: e.target.value })
+                        }
+                        placeholder="Nhập lời giải của bạn để nhận ngay +40 XP..."
+                        className="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 text-xs"
+                      />
+                      <button
+                        onClick={() => handleSendReply(post.id)}
+                        className="bg-blue-600 text-white text-xs font-extrabold px-4 py-2 rounded-xl hover:bg-blue-700 transition flex items-center gap-1"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Gửi (+40 XP)</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-between text-xs">
+                      <span className="text-slate-600 font-semibold">
+                        Bạn cần đăng nhập tài khoản để trả lời câu hỏi này và nhận +40 XP.
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage('auth')}
+                        className="text-blue-600 font-extrabold hover:underline shrink-0 ml-2"
+                      >
+                        Đăng nhập →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
+        {/* ------------------------------------------ */}
+        {/* MÀN HÌNH 8: XƯỞNG NHÂN VẬT & GIỮ CHUỖI */}
+        {/* ------------------------------------------ */}
+        {currentPage === 'streak-studio' && (
+          <div className="max-w-3xl mx-auto bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 space-y-6">
+            <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-slate-100">
+              <StudentAvatarBadge
+                config={avatarConfig}
+                customPhoto={customAvatarUrl}
+                streakDays={streakDays}
+                size="lg"
+              />
+              <div className="space-y-2 text-center sm:text-left flex-1">
+                <h1 className="text-xl font-black text-slate-900">
+                  Xưởng Nhân Vật Học Sinh & Giữ Chuỗi (KPI 200 XP/Ngày)
+                </h1>
+                <p className="text-xs text-slate-500">
+                  Tích đủ 200 XP mỗi ngày từ làm bài tập 120 câu/chương, giải đề thi hoặc trả lời câu hỏi trên Hỏi Đáp 24/7 để duy trì chuỗi lửa học tập.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1 justify-center sm:justify-start">
+                  <label className="cursor-pointer bg-blue-600 text-white text-xs font-extrabold px-4 py-2 rounded-xl hover:bg-blue-700 inline-flex items-center gap-1.5">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Tải ảnh từ thiết bị làm Avatar</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  {customAvatarUrl && (
+                    <button
+                      onClick={() => setCustomAvatarUrl(null)}
+                      className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-2 rounded-xl"
+                    >
+                      Dùng lại Nhân vật Học sinh Việt Nam
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
+                  Trang phục học sinh
+                </label>
+                <select
+                  value={avatarConfig.outfit}
+                  onChange={(e) => setAvatarConfig({ ...avatarConfig, outfit: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold"
+                >
+                  <option value="uniform_scarf">Áo trắng + Khăn quàng đỏ</option>
+                  <option value="aodai">Áo dài trắng Việt Nam</option>
+                  <option value="jacket">Áo khoác đồng phục StudyEz</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
+                  Kiểu tóc
+                </label>
+                <select
+                  value={avatarConfig.hair}
+                  onChange={(e) => setAvatarConfig({ ...avatarConfig, hair: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold"
+                >
+                  <option value="boy_neat">Tóc nam sinh gọn gàng</option>
+                  <option value="girl_twintail">Tóc nữ sinh buộc hai bên</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 mb-1.5">
+                  Phụ kiện mắt kính
+                </label>
+                <button
+                  onClick={() =>
+                    setAvatarConfig({ ...avatarConfig, glasses: !avatarConfig.glasses })
+                  }
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-bold bg-slate-50"
+                >
+                  {avatarConfig.glasses ? 'Đang đeo Kính cận tri thức' : 'Không đeo kính'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------ */}
+        {/* MÀN HÌNH 9: XÁC THỰC TÀI KHOẢN GOOGLE (@GMAIL.COM) */}
+        {/* ------------------------------------------ */}
+        {currentPage === 'auth' && (
+          <div className="max-w-md mx-auto bg-white p-7 rounded-3xl border border-slate-200 space-y-5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <h1 className="text-xl font-black text-slate-900">
+                Xác Thực Tài Khoản Google (Gmail)
+              </h1>
+              {currentUser && (
+                <button
+                  onClick={() => setCurrentUser(null)}
+                  className="text-xs font-bold text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg flex items-center gap-1"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Đăng xuất</span>
+                </button>
+              )}
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Đăng nhập bằng tài khoản Google (<code>@gmail.com</code>) để mở khóa quyền <strong>Hỏi Đáp 24/7</strong> và nhận <strong>01 lượt trải nghiệm miễn phí cho từng môn Ôn Thi Chuyên</strong>.
+            </p>
+
+            <button
+              onClick={() => setShowGmailModal(!showGmailModal)}
+              className="w-full py-3.5 px-4 rounded-xl border-2 border-blue-500 bg-blue-50/50 hover:bg-blue-50 flex items-center justify-center gap-2.5 text-xs font-black text-blue-800 transition"
+            >
+              <Mail className="w-4 h-4 text-rose-500" />
+              <span>Xác Thực Nhanh Bằng Tài Khoản Google (@gmail.com)</span>
+            </button>
+
+            {showGmailModal && (
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="text-xs font-extrabold text-slate-700">
+                  Chọn tài khoản Google để xác thực:
+                </div>
+                {[
+                  { nick: '@minhthao_studyez_k9', mail: 'minhthao.dongnai@gmail.com' },
+                  { nick: '@hocsinh_chuyen_k9', mail: 'onthichuyen.studyez@gmail.com' }
+                ].map((acc) => (
+                  <button
+                    key={acc.mail}
+                    onClick={() => {
+                      setCurrentUser({
+                        nickname: acc.nick,
+                        email: acc.mail,
+                        isGoogleVerified: true
+                      });
+                      setShowGmailModal(false);
+                      addXp(20, 'Xác thực Google thành công');
+                    }}
+                    className="w-full p-2.5 rounded-xl bg-white border border-slate-200 hover:border-blue-500 text-left flex items-center justify-between text-xs"
+                  >
+                    <div>
+                      <div className="font-extrabold text-slate-900">{acc.nick}</div>
+                      <div className="text-slate-500">{acc.mail}</div>
+                    </div>
+                    <span className="text-blue-600 font-bold">Xác thực →</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="space-y-3 pt-3 border-t border-slate-100">
+              <div className="text-xs font-extrabold text-slate-700">
+                Hoặc nhập trực tiếp Gmail của bạn:
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Nickname hiển thị
+                </label>
+                <input
+                  type="text"
+                  value={authForm.nickname}
+                  onChange={(e) => setAuthForm({ ...authForm, nickname: e.target.value })}
+                  placeholder="@nickname_cua_ban"
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Tài khoản Google (bắt buộc đuôi @gmail.com)
+                </label>
+                <input
+                  type="email"
+                  value={authForm.email}
+                  onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+                  placeholder="tenban@gmail.com"
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300"
+                />
+              </div>
+              <button
+                onClick={() => {
+                  const mail = authForm.email.trim().toLowerCase();
+                  if (!mail.endsWith('@gmail.com')) {
+                    alert('Vui lòng nhập đúng địa chỉ Google có đuôi @gmail.com để xác thực!');
+                    return;
+                  }
+                  const nick = authForm.nickname.trim() || `@${mail.split('@')[0]}`;
+                  setCurrentUser({
+                    nickname: nick.startsWith('@') ? nick : `@${nick}`,
+                    email: mail,
+                    isGoogleVerified: true
+                  });
+                  addXp(20, 'Đăng nhập Google thành công');
+                }}
+                className="w-full bg-blue-600 text-white text-xs font-extrabold py-3 rounded-xl hover:bg-blue-700 transition"
+              >
+                Xác Thực Google & Lưu Hồ Sơ
+              </button>
+            </div>
+          </div>
+        )}
       </main>
 
-      {/* VỊ TRÍ CHỪA QUẢNG CÁO VIDEO */}
-      <footer className="bg-slate-800 h-24 mt-12 flex items-center justify-center text-white text-xs font-bold">
-        [VIDEO AD SLOT] Khung trình chiếu Video quảng cáo đối tác
+      {/* ========================================== */}
+      {/* CHÂN TRANG (FOOTER) */}
+      {/* ========================================== */}
+      <footer className="bg-white border-t border-slate-200 mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+          <div>
+            <span className="font-black text-blue-700">StudyEz PRO 2.0 (studyez.vn)</span> — 120 Câu/Chương • 55 Đề GK/HK mỗi môn • 60 Đề Sở Vào 10 & Ôn Thi Chuyên PREMIUM.
+          </div>
+          <button
+            onClick={() => setQuoteIdx((quoteIdx + 1) % QUOTES.length)}
+            className="text-slate-600 italic hover:text-blue-600"
+          >
+            "{QUOTES[quoteIdx].text}" ({QUOTES[quoteIdx].author}) ↻
+          </button>
+        </div>
       </footer>
     </div>
   );
